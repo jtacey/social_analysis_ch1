@@ -1,0 +1,233 @@
+---
+title: "cleaning_nam_data_oct26"
+author: "Jessica Tacey"
+date: "2026-10-27"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## R Markdown
+
+This is an R Markdown document. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see <http://rmarkdown.rstudio.com>.
+
+When you click the **Knit** button a document will be generated that includes both content as well as the output of any embedded R code chunks within the document. You can embed an R code chunk like this:
+
+```{r cars}
+summary(cars)
+```
+
+## Including Plots
+
+You can also embed plots, for example:
+
+```{r pressure, echo=FALSE}
+plot(pressure)
+```
+
+Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
+
+#Loading in data 
+
+Set working directory: ANALYSIS folder in PhD Work folder 
+
+## To clean/ fix: 
+
+Sesfontein first day:
+	• Vicky - household 4 - went straight to b and accidentally skipped a 
+	• Jade - household 5 - same as Vicky’s household 4
+	• Tanigu and David: Did households 3 and 5 together. Tanigu did ‘a’ and David ‘b’. 
+	• Vicky household 11 forgot to put A.
+	• Vicky might have done a double up on household 22
+	
+Throughout surveying:
+	• Kevin E28a and E28b - wrote the wrong village Okondaurie when we were actually in Omungunda
+	• Check for repeats in Vicky's household 38 and Jade's ~59
+	• Check David's household ~38 from 14/4
+	• From Sesfontein: David sometimes put household number first and then his B, Tanigu was doing lists of household ID like A21aA21b
+	• 14/4/26: David started on house 38, might be a double up of last house he did day before 
+	• 15/4/26: Change Tanigu's surveys for today to Condor Pos not just Condor --> check others are also Condor Pos because that's the official name people in village were using 
+	• Huab conservancy: Rockys village is the same as Rockys Opstal --> Tanigu wrote Rockys Opstal, check what the others did. 
+	• Tanigu: 97a,b and Gwen: 93a = same household in Sorris. Change Gwen's to Tanigu 97c. 
+
+	• Make sure to cross check dates we were surveying with dates surveys recorded in Qualtrics in case there’s practice ones that were submitted
+		○ 8th April: looks like Gwen did a practice one
+		○ 12th April: Tanigu and Gwen did a practice one during training
+		
+##		Other to clean/fix:
+		- When binding datasets together, the captions are still there along with what looks like automated Qualtrics coding. Get rid of this/but still make easy to navigate.
+		- "age" was grouped in the Herero and Damara surveys (18-30, 31-40, 41-50, 51-60,61-70, Over 70), while respondents selected a single year in US and Germany surveys. US and Germany has additional columns for - "Age_Raw" and "Age_Grouped" but with different grouping (18-35, 36-55,56+). Regroup US and Germany using "age" or "Age_Raw" into the same groups as Herero and Damara data. 
+		- Sub out all other languages for English: could be cautious and do this by replicating every column --> e.g. Col1 Damara response, Col1 English response, --> see if they have the same number of observations. 
+		- Make sure data is prepared for analysis --> i.e. if ordered categories make sure structured this way, if factors make sure factors. 
+		
+		
+		
+*Install any required packages*
+
+```{r}
+install.packages("tidyverse")
+install.packages("dplyr")
+install.packages("purrr")
+
+library(tidyverse)
+library(dplyr)
+library(purrr)
+
+```
+
+*Load full data first*
+
+```{r}
+data_full_herero <- read.csv("/Users/jess-uni/Documents/Documents - Jess T/PhD_Work/00_ANALYSIS/Raw Data/Raw Data_Namibia Survey - Herero Final_May 5, 2026_14.00.csv", stringsAsFactors = FALSE)
+data_full_damara <- read.csv('/Users/jess-uni/Documents/Documents - Jess T/PhD_Work/00_ANALYSIS/Raw Data/damara_raw_data_oct26.csv', stringsAsFactors = FALSE)
+data_full_germany <- read.csv('/Users/jess-uni/Documents/Documents - Jess T/PhD_Work/00_ANALYSIS/Raw Data/partial_germany_raw_data_nov26.csv', stringsAsFactors = FALSE)
+data_full_us <- read.csv('/Users/jess-uni/Documents/Documents - Jess T/PhD_Work/00_ANALYSIS/Raw Data/partial_us_raw_data_nov26.csv', stringsAsFactors = FALSE)
+
+```
+
+
+*Create a new object for the reduced data*
+
+```{r}
+herero <- data_full_herero
+damara <- data_full_damara
+germany <- data_full_germany
+us <- data_full_us
+```
+
+
+*Compare the column names across datasets, to prepare for combining into one dataset*
+
+```{r}
+#Put columns from all four datasets side by side for comparison
+
+datasets <- list(herero, damara, germany, us)
+
+# Put column names side by side
+cols <- list(names(herero), names(damara), names(germany), names(us))
+
+# Pad shorter lists with NA
+cols <- lapply(cols, function(x) {
+  length(x) <- max(lengths(cols))
+  x
+})
+
+# Create table of all column names in each dataset to compare 
+compare_col_names <- as.data.frame(cols)
+names(compare_col_names) <- c("herero", "damara", "germany", "us")
+
+View(compare_col_names)
+```
+
+*Combine all four different language datasets by binding together, because my research questions are focused on comparing across all conservancies, and all locations, so I need the dataset to be one large singular file.*
+*Bind all columns first*
+
+```{r}
+
+# Combine four datasets, matching columns by name
+all_cols <- unique(c(names(herero), names(damara), names(germany), names(us)))
+
+datasets <- lapply(list(herero, damara, germany, us), function(df) {
+  df[setdiff(all_cols, names(df))] <- NA
+  df[all_cols]
+})
+
+all_dfs_combined <- do.call(rbind, datasets)
+
+View(all_dfs_combined)
+
+#Check that bind has been done correctly - number of rows make sense:
+
+sum(sapply(list(herero, damara, germany, us), nrow))
+nrow(all_dfs_combined)
+
+#Check combined dataset matches expected result:
+
+originals <- list(herero, damara, germany, us)
+
+# Recreate the combined dataset from the originals
+expected <- do.call(rbind, lapply(originals, function(df) {
+  df[setdiff(all_cols, names(df))] <- NA
+  df[all_cols]
+}))
+
+# Compare it with your combined dataset. Returns TRUE = combined dataset matches expected incl number of rows, column names, column order, and values
+isTRUE(all.equal(expected, all_dfs_combined))
+
+```
+
+*Remove unnecessary columns and rows from combined dataset*
+
+```{r}
+
+# Display all column names with their numbers:
+data.frame(Number = seq_along(all_dfs_combined), Name = names(all_dfs_combined))
+
+# Remove unnecessary columns:
+all_dfs_combined <- all_dfs_combined[, !names(all_dfs_combined) %in% c("IPAddress","Progress","Finished","RecipientLastName","RecipientFirstName","RecipientEmail","ExternalReference","opp","tg", "transaction_id","Q_BallotBoxStuffing","Q_RelevantIDDuplicate","Q_RelevantIDFraudScore","Q_RelevantIDDuplicateScore","pureSpectrumSignatureValue", "supplier_id", "Q_CHL", "PS", "gc", "term", "Vendor", "QPMID", "tern")]
+ncol(all_dfs_combined)
+
+#While removing uneccessary columns, check for unique values in them to see if worth keeping, and how many of each unique value there are:
+#unique(all_dfs_combined$opp)
+#table(all_dfs_combined$Q_DuplicateRespondent, useNA = "ifany")
+
+# Display all UPDATED column names with their numbers:
+data.frame(Number = seq_along(all_dfs_combined), Name = names(all_dfs_combined))
+
+```
+
+*Rename columns in combined dataset*
+```{r}
+
+names(all_dfs_combined)[names(all_dfs_combined) == "Duration..in.seconds."] <- "duration_sec"
+names(all_dfs_combined)[names(all_dfs_combined) == "conservancy_id_1"] <- "conservancy"
+names(all_dfs_combined)[names(all_dfs_combined) == "village_id_1"] <- "village"
+names(all_dfs_combined)[names(all_dfs_combined) == "household_id_1"] <- "household"
+names(all_dfs_combined)[names(all_dfs_combined) == "v1_none.ac"] <- "v1_no_conf_aversive"
+names(all_dfs_combined)[names(all_dfs_combined) == "v2_none.t"] <- "v2_no_conf_trans"
+names(all_dfs_combined)[names(all_dfs_combined) == "v3_none.ch"] <- "v3_no_conf_hunt"
+names(all_dfs_combined)[names(all_dfs_combined) == "v4_none.c"] <- "v4_no_conf_cull"
+names(all_dfs_combined)[names(all_dfs_combined) == "v5_none.k"] <- "v5_no_conf_kill"
+names(all_dfs_combined)[names(all_dfs_combined) == "v6_sc.ac"] <- "v6_some_conf_aversive"
+names(all_dfs_combined)[names(all_dfs_combined) == "v7_sc.t"] <- "v7_some_conf_trans"
+names(all_dfs_combined)[names(all_dfs_combined) == "v8_sc.ch"] <- "v8_some_conf_hunt"
+names(all_dfs_combined)[names(all_dfs_combined) == "v9_sc.c."] <- "v9_some_conf_cull"
+names(all_dfs_combined)[names(all_dfs_combined) == "v10_sc.k"] <- "v10_some_conf_kill"
+names(all_dfs_combined)[names(all_dfs_combined) == "v11_fc.ac"] <- "v11_freq_conf_aversive"
+names(all_dfs_combined)[names(all_dfs_combined) == "v12_fc.t"] <- "v12_freq_conf_trans"
+names(all_dfs_combined)[names(all_dfs_combined) == "v13_fc.ch"] <- "v13_freq_conf_hunt"
+names(all_dfs_combined)[names(all_dfs_combined) == "v14_fc.c"] <- "v14_freq_conf_cull"
+names(all_dfs_combined)[names(all_dfs_combined) == "v15_fc.k"] <- "v15_freq_conf_kill"
+names(all_dfs_combined)[names(all_dfs_combined) == "ethnicity"] <- "ethnicity_qu"
+names(all_dfs_combined)[names(all_dfs_combined) == "ethnicity_1_TEXT"] <- "ethnicity_ans"
+names(all_dfs_combined)[names(all_dfs_combined) == "gov_employment"] <- "gov_employment_qu"
+names(all_dfs_combined)[names(all_dfs_combined) == "gov_employment_3_TEXT"] <- "gov_employment_ans_h" #Herero answers for this question - columns not combined? 
+names(all_dfs_combined)[names(all_dfs_combined) == "livelihood"] <- "livelihood_qu"
+names(all_dfs_combined)[names(all_dfs_combined) == "livelihood_5_TEXT"] <- "livelihood_ans"
+names(all_dfs_combined)[names(all_dfs_combined) == "gov_employment_2_TEXT"] <- "gov_employment_ans_d" #Damara answers for this question - columns not combined?
+names(all_dfs_combined)[names(all_dfs_combined) == "gender_3_TEXT"] <- "gender_fix" #some random non-specific gender answers - investigate and fix
+names(all_dfs_combined)[names(all_dfs_combined) == "Age_Raw"] <- "age_raw_germ_us" 
+names(all_dfs_combined)[names(all_dfs_combined) == "Age_Grouped"] <- "age_grouped_germ_us" # age, Age_Raw, and Age_Grouped need to be combined ?? 
+
+```
+
+
+NEXT: Do cleaning up of columns and column variables listed at start of script. Remember to focus on columns of interest first - experimental variables. 
+
+
+```{r}
+
+```
+
+
+
+
+
+
+
+
+
+
+
